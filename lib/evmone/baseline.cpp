@@ -68,7 +68,8 @@ CodeAnalysis analyze_legacy(bytes_view code)
 
 CodeAnalysis analyze_eof1(bytes_view::const_iterator code, const EOF1Header& header)
 {
-    auto code_and_jumpdest_map = analyze_jumpdests({&code[header.code_begin()], header.code_size});
+    auto code_and_jumpdest_map =
+        analyze_jumpdests({&code[header.code_begin(0)], header.code_sizes[0]});
     return {std::move(code_and_jumpdest_map.first), std::move(code_and_jumpdest_map.second), false};
 }
 }  // namespace
