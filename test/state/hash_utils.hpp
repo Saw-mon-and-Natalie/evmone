@@ -7,6 +7,7 @@
 #include <ethash/keccak.hpp>
 #include <evmc/evmc.hpp>
 #include <evmc/hex.hpp>
+#include <bit>
 #include <cstring>
 
 namespace evmone
@@ -26,8 +27,6 @@ using hash256 = bytes32;
 inline hash256 keccak256(bytes_view data) noexcept
 {
     const auto eh = ethash::keccak256(data.data(), data.size());
-    hash256 h;
-    std::memcpy(h.bytes, eh.bytes, sizeof(h));  // TODO: Use std::bit_cast.
-    return h;
+    return std::bit_cast<hash256>(eh);
 }
 }  // namespace evmone

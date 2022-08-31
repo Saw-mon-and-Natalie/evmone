@@ -5,6 +5,7 @@
 add_library(evmone-state STATIC)
 add_library(evmone::state ALIAS evmone-state)
 target_link_libraries(evmone-state PRIVATE evmc::evmc_cpp ethash::keccak)
+target_compile_features(evmone-state PUBLIC cxx_std_20)
 target_sources(
     evmone-state PRIVATE
     account.hpp
