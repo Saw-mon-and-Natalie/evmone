@@ -28,13 +28,8 @@ namespace evmone::baseline
 {
 namespace
 {
-std::pair<std::unique_ptr<uint8_t[]>, CodeAnalysis::JumpdestMap> analyze_jumpdests(bytes_view code)
+CodeAnalysis::JumpdestMap analyze_jumpdests(bytes_view code)
 {
-    // We need at most 33 bytes of code padding: 32 for possible missing all data bytes of PUSH32
-    // at the very end of the code; and one more byte for STOP to guarantee there is a terminating
-    // instruction at the code end.
-    constexpr auto padding = 32 + 1;
-
     // To find if op is any PUSH opcode (OP_PUSH1 <= op <= OP_PUSH32)
     // it can be noticed that OP_PUSH32 is INT8_MAX (0x7f) therefore
     // static_cast<int8_t>(op) <= OP_PUSH32 is always true and can be skipped.
@@ -49,6 +44,20 @@ std::pair<std::unique_ptr<uint8_t[]>, CodeAnalysis::JumpdestMap> analyze_jumpdes
         else if (INTX_UNLIKELY(op == OP_JUMPDEST))
             map[i] = true;
     }
+    return map;
+}
+
+CodeAnalysis analyze_legacy(bytes_view code)
+{
+    // We need at most 33 bytes of code padding: 32 for possible missing all data bytes of PUSH32
+    // at the very end of the code; and one more byte for STOP to guarantee there is a terminating
+    // instruction at the code end.
+    constexpr auto padding = 32 + 1;
+
+    // To find if op is any PUSH opcode (OP_PUSH1 <= op <= OP_PUSH32)
+    // it can be noticed that OP_PUSH32 is INT8_MAX (0x7f) therefore
+    // static_cast<int8_t>(op) <= OP_PUSH32 is always true and can be skipped.
+    static_assert(OP_PUSH32 == std::numeric_limits<int8_t>::max());
 
     // Using "raw" new operator instead of std::make_unique() to get uninitialized array.
     std::unique_ptr<uint8_t[]> padded_code{new uint8_t[code.size() + padding]};
@@ -56,22 +65,22 @@ std::pair<std::unique_ptr<uint8_t[]>, CodeAnalysis::JumpdestMap> analyze_jumpdes
     std::fill_n(&padded_code[code.size()], padding, uint8_t{OP_STOP});
 
     // TODO: The padded code buffer and jumpdest bitmap can be created with single allocation.
-    return std::make_pair(std::move(padded_code), std::move(map));
+    return {std::move(padded_code), {analyze_jumpdests(code)}, {}, true};
 }
 
-
-CodeAnalysis analyze_legacy(bytes_view code)
+CodeAnalysis analyze_eof1(bytes_view container, const EOF1Header& header)
 {
-    auto code_and_jumpdest_map = analyze_jumpdests(code);
-    return {std::move(code_and_jumpdest_map.first), std::move(code_and_jumpdest_map.second), true};
+    std::vector<CodeAnalysis::JumpdestMap> jumpdest_maps;
+    std::vector<bytes_view> codes;
+    for (size_t i = 0; i < header.code_offsets.size(); ++i)
+    {
+        codes.emplace_back(&container[header.code_offsets[i]], header.code_sizes[i]);
+        const auto jumpdest_map = analyze_jumpdests(codes.back());
+        jumpdest_maps.emplace_back(jumpdest_map);
+    }
+    return {{}, jumpdest_maps, codes, false};
 }
 
-CodeAnalysis analyze_eof1(bytes_view::const_iterator code, const EOF1Header& header)
-{
-    auto code_and_jumpdest_map =
-        analyze_jumpdests({&code[header.code_begin(0)], header.code_sizes[0]});
-    return {std::move(code_and_jumpdest_map.first), std::move(code_and_jumpdest_map.second), false};
-}
 }  // namespace
 
 CodeAnalysis analyze(evmc_revision rev, bytes_view code)
@@ -80,7 +89,7 @@ CodeAnalysis analyze(evmc_revision rev, bytes_view code)
         return analyze_legacy(code);
 
     const auto eof1_header = read_valid_eof1_header(code.begin());
-    return analyze_eof1(code.begin(), eof1_header);
+    return analyze_eof1(code, eof1_header);
 }
 
 namespace

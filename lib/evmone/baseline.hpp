@@ -23,7 +23,8 @@ struct CodeAnalysis
     using JumpdestMap = std::vector<bool>;
 
     std::unique_ptr<uint8_t[]> padded_code;
-    JumpdestMap jumpdest_map;
+    std::vector<JumpdestMap> jumpdest_maps;
+    std::vector<bytes_view> codes;
     bool is_legacy_code = false;
 };
 static_assert(std::is_move_constructible_v<CodeAnalysis>);
