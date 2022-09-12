@@ -242,12 +242,20 @@ template <evmc_opcode Op>
         break
 
 template <bool TracingEnabled>
-evmc_result execute(const VM& vm, ExecutionState& state, const CodeAnalysis& analysis) noexcept
+evmc_result execute(
+    const VM& vm, ExecutionState& state, const CodeAnalysis& analysis, size_t code_index) noexcept
 {
     state.analysis.baseline = &analysis;  // Assign code analysis for instruction implementations.
 
-    // Use padded code.
-    state.code = {analysis.padded_code.get(), state.code.size()};
+    if (analysis.is_legacy_code)
+    {
+        // Use padded code.
+        state.code = {analysis.padded_code.get(), state.code.size()};
+    }
+    else
+    {
+        state.code = analysis.codes[code_index];
+    }
 
     auto* tracer = vm.get_tracer();
     if constexpr (TracingEnabled)
@@ -299,21 +307,22 @@ exit:
 }
 }  // namespace
 
-evmc_result execute(const VM& vm, ExecutionState& state, const CodeAnalysis& analysis) noexcept
+evmc_result execute(
+    const VM& vm, ExecutionState& state, const CodeAnalysis& analysis, size_t code_index) noexcept
 {
     if (INTX_UNLIKELY(vm.get_tracer() != nullptr))
-        return execute<true>(vm, state, analysis);
+        return execute<true>(vm, state, analysis, code_index);
 
-    return execute<false>(vm, state, analysis);
+    return execute<false>(vm, state, analysis, code_index);
 }
 
 evmc_result execute(evmc_vm* c_vm, const evmc_host_interface* host, evmc_host_context* ctx,
     evmc_revision rev, const evmc_message* msg, const uint8_t* code, size_t code_size) noexcept
 {
     auto vm = static_cast<VM*>(c_vm);
-    const auto jumpdest_map = analyze(rev, {code, code_size});
+    const auto code_analysis = analyze(rev, {code, code_size});
     auto state =
         std::make_unique<ExecutionState>(*msg, rev, *host, ctx, bytes_view{code, code_size});
-    return execute(*vm, *state, jumpdest_map);
+    return execute(*vm, *state, code_analysis, 0);
 }
 }  // namespace evmone::baseline
