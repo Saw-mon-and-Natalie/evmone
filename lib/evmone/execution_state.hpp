@@ -146,6 +146,8 @@ public:
     size_t output_offset = 0;
     size_t output_size = 0;
 
+    size_t code_index = 0;
+
 private:
     evmc_tx_context m_tx = {};
 
@@ -193,6 +195,7 @@ public:
         output_offset = 0;
         output_size = 0;
         m_tx = {};
+        code_index = 0;
     }
 
     [[nodiscard]] bool in_static_mode() const { return (msg->flags & EVMC_STATIC) != 0; }

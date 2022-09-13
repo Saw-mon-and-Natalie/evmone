@@ -741,8 +741,7 @@ inline evmc_status_code sstore(StackTop stack, ExecutionState& state) noexcept
 /// Internal jump implementation for JUMP/JUMPI instructions.
 inline code_iterator jump_impl(ExecutionState& state, const uint256& dst) noexcept
 {
-    // TODO get section index from ExecutionState
-    const auto& jumpdest_map = state.analysis.baseline->jumpdest_maps[0];
+    const auto& jumpdest_map = state.analysis.baseline->jumpdest_maps[state.code_index];
     if (dst >= jumpdest_map.size() || !jumpdest_map[static_cast<size_t>(dst)])
     {
         state.status = EVMC_BAD_JUMP_DESTINATION;
